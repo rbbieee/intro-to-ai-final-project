@@ -54,7 +54,7 @@ def fuzzify_propextent(val):
         "None":         float(trapmf(x, 0, 0, 0, 0.5)[0]),
         "Minor":        float(trimf(x, 0.5, 1, 1.5)[0]),
         "Major":        float(trimf(x, 1.5, 2, 2.5)[0]),
-        "Catastrophic": float(trapmf(x, 2.5, 3, 3, 3)[0]),
+        "Catastrophic": float(trapmf(x, 2.5, 2.8, 4, 4)[0]),
     }
 
 def fuzzify_attack(val):
@@ -63,7 +63,7 @@ def fuzzify_attack(val):
         "Low":     float(trapmf(x, 1, 1, 1, 1.8)[0]),
         "Medium":  float(trimf(x, 1.5, 2, 2.5)[0]),
         "High":    float(trimf(x, 2.5, 3, 3.5)[0]),
-        "Extreme": float(trapmf(x, 3.2, 3.6, 5, 5)[0]),
+        "Extreme": float(trapmf(x, 2.8, 3.5, 5, 5)[0]),
     }
 
 def fuzzify_weapon(val):
@@ -72,47 +72,44 @@ def fuzzify_weapon(val):
         "Low":     float(trapmf(x, 1, 1, 1, 1.8)[0]),
         "Medium":  float(trimf(x, 1.5, 2, 2.5)[0]),
         "High":    float(trimf(x, 2.5, 3, 3.5)[0]),
-        "Extreme": float(trapmf(x, 3.2, 3.6, 5, 5)[0]),
+        "Extreme": float(trapmf(x, 2.8, 3.5, 5, 5)[0]),
     }
 
-rules = [
-    ("Low",    "Low",    "None",         "Low",    "Low",    "Low"),
-    ("Low",    "Low",    "None",         "Low",    "Medium", "Low"),
-    ("Low",    "Low",    "Minor",        "Low",    "Low",    "Low"),
-    ("Low",    "Low",    "Major",        "Low",    "Low",    "Medium"),
-    ("Medium", "Low",    "None",         "Low",    "Low",    "Medium"),
-    ("Medium", "Medium", "Minor",        "Medium", "Medium", "Medium"),
-    ("Low",    "Medium", "Major",        "Low",    "Medium", "Medium"),
-    ("Low",    "Low",    "None",         "High",   "High",   "Medium"),
-    ("Low",    "Low",    "Minor",        "Medium", "High",   "Medium"),
-    ("Low",    "Low",    "None",         "Medium", "Medium", "Medium"),
-    ("Low",    "Low",    "None",         "High",   "Medium", "Medium"),
-    ("Low",    "Low",    "None",         "Medium", "High",   "Medium"),
-    ("Low",    "Low",    "Minor",        "High",   "Medium", "Medium"),
-    ("Low",    "Low",    "None",         "Extreme","Medium", "Medium"),
-    ("Low",    "Low",    "None",         "Medium", "Extreme","Medium"),
-    ("Medium", "Medium", "Major",        "Medium", "High",   "High"),
-    ("High",   "Low",    "Minor",        "High",   "Medium", "High"),
-    ("High",   "Medium", "None",         "High",   "High",   "High"),
-    ("Medium", "High",   "Major",        "Medium", "High",   "High"),
-    ("High",   "High",   "Minor",        "High",   "Medium", "High"),
-    ("Low",    "High",   "Major",        "Extreme","High",   "High"),
-    ("Medium", "Low",    "Major",        "High",   "Extreme","High"),
-    ("Low",    "Low",    "None",         "Extreme","Extreme","High"),
-    ("Low",    "Low",    "Minor",        "Extreme","High",   "High"),
-    ("Medium", "Low",    "None",         "Extreme","High",   "High"),
-    ("Low",    "Medium", "None",         "Extreme","Extreme","High"),
-    ("High",   "Medium", "Major",        "High",   "Extreme","Critical"),
-    ("High",   "High",   "Major",        "Extreme","Extreme","Critical"),
-    ("Extreme","High",   "Major",        "Extreme","High",   "Critical"),
-    ("Extreme","Extreme","Catastrophic", "Extreme","Extreme","Critical"),
-    ("High",   "High",   "Catastrophic", "High",   "Extreme","Critical"),
-    ("Extreme","Medium", "Major",        "Extreme","High",   "Critical"),
-    ("Extreme", "High",   "Major", "High", "High", "Critical"),
-    ("Extreme", "Medium", "Major", "High", "High", "Critical"),
-    ("High",    "High",   "Major", "High", "High", "Critical"),
-    ("Extreme", "High",   "None",  "High", "High", "Critical"),
-]
+def assign_severity(k, w, p, a, wp):
+    kill_score  = {"Low": 0, "Medium": 1, "High": 2, "Extreme": 3}
+    wound_score = {"Low": 0, "Medium": 1, "High": 2, "Extreme": 3}
+    prop_score  = {"None": 0, "Minor": 1, "Major": 2, "Catastrophic": 3}
+    atk_score   = {"Low": 0, "Medium": 1, "High": 2, "Extreme": 3}
+    wpn_score   = {"Low": 0, "Medium": 1, "High": 2, "Extreme": 3}
+
+    score = (
+        0.35 * kill_score[k]  +
+        0.25 * wound_score[w] +
+        0.15 * prop_score[p]  +
+        0.15 * atk_score[a]   +
+        0.10 * wpn_score[wp]
+    )
+
+    if score < 0.75:
+        return "Low"
+    elif score < 1.5:
+        return "Medium"
+    elif score < 2.25:
+        return "High"
+    else:
+        return "Critical"
+
+kill_levels = ["Low", "Medium", "High", "Extreme"]
+prop_levels = ["None", "Minor", "Major", "Catastrophic"]
+
+rules = []
+for k in kill_levels:
+    for w in kill_levels:
+        for p in prop_levels:
+            for a in kill_levels:
+                for wp in kill_levels:
+                    sev = assign_severity(k, w, p, a, wp)
+                    rules.append((k, w, p, a, wp, sev))
 
 x_out = np.linspace(0, 100, 1000)
 
@@ -188,7 +185,7 @@ def label_color(label):
 
 # ui
 st.title("GTD Terrorism Attack Severity Classifier")
-st.markdown("**The Best Team Ever | IF-48-INT | DKA Tubes 2025/2026**")
+st.markdown("**The Best Team Ever | IF-48-INT | DKA Final Project**")
 st.markdown("Robbie Yudistira (103012400001) | Frederick Octo Ramadani (103012440019) | Rei Hashimoto (103012450001)")
 st.markdown("Classify terrorism attack severity using Fuzzy Logic (Mamdani & Sugeno) and Random Forest.")
 st.divider()
